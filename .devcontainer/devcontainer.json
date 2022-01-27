@@ -1,21 +1,16 @@
 {
   "name": "zenn-contents",
-
-  "build": {
-    "dockerfile": "Dockerfile",
-    "args": { "VARIANT": "16-bullseye" }
-  },
-  "settings": {},
-  "extensions": ["eamodio.gitlens", "GitHub.vscode-pull-request-github"],
+  "image": "mcr.microsoft.com/vscode/devcontainers/javascript-node:0-16-bullseye",
+  "extensions": ["GitHub.vscode-pull-request-github"],
   "portsAttributes": {
-    "3000": {
-      "label": "Hello Remote World",
-      "onAutoForward": "notify"
+    "8000": {
+      "label": "Zenn Preview",
+      "onAutoForward": "openBrowser"
     }
   },
   "features": {
     "github-cli": "latest"
   },
-  "postCreateCommand": "npm install zenn-cli@latest",
+  "postStartCommand": "npm install",
   "remoteUser": "node"
 }

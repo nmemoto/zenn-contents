@@ -1,0 +1,50 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Zenn: Run Preview",
+            "type": "shell",
+            "command": "npx",
+            "args": [
+                "zenn",
+                "preview"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "panel": "dedicated",
+                "clear": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Zenn: Create New Article",
+            "type": "shell",
+            "command": "npx",
+            "args": [
+                "zenn",
+                "new:article",
+                "--slug",
+                "${input:slug}"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "panel": "dedicated",
+                "clear": true
+            },
+            "problemMatcher": []
+        },
+    ],
+    "inputs": [
+        {
+            "id": "slug",
+            "type": "promptString",
+            "description": "slug"
+        }
+    ]
+}
