@@ -147,7 +147,7 @@ docker.errors.APIError: 500 Server Error: Internal Server Error ("b'Mounts denie
 ```
 
 これは、`AppStack.template.json`内の`AppStack-Function`という名前の関数の"Metadata.aws:asset:path"にあるパスをsam local invoke コマンドがlambda関数のファイルを見つけられず発生している。
-そして、コンテナ内に存在する`/workspaces/vscode-remote-containers-cdk-and-sam/app/lambda/my_function`というディレクトリが、sam local invokeコマンドでコンテナを立てるホストのDocker Engineから見ると存在しない(つまり、ホストのディレクトリに存在しない)ために起こっている。
+言い換えると、コンテナ内に存在する`/workspaces/vscode-remote-containers-cdk-and-sam/app/lambda/my_function`というディレクトリが、sam local invokeコマンドでコンテナを立てるホストのDocker Engineから見ると存在しない(つまり、ホストのディレクトリに存在しない)ためにこの事象が起こっている。
 
 つまり、コンテナ内でsam local invokeコマンド実行時に、ホストのDocker Engineから見て存在するパスにLambda関数のファイルが存在しなくてはならない。
 これは、ホストのソースコードを配置しているディレクトリとコンテナ内のソースコードを配置しているディレクトリを同じ構成にしてしまえば実現でき、この設定をWorkspace Volume Mount の設定で行っている。
