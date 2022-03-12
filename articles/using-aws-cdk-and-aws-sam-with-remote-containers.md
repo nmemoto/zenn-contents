@@ -1,5 +1,5 @@
 ---
-title: "VSCode Remote Containers で git push AWS CDK と AWS SAM を使いコンテナ内部でLambdaを実行する"
+title: "VSCode Remote Containers で AWS CDK と AWS SAM を使いコンテナ内部でLambdaを実行する"
 emoji: "📌"
 type: "tech" # tech: 技術記事 / idea: アイデア
 topics: ["vscode", "AWS", "CDK", "SAM"]
