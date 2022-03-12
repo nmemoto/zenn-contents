@@ -1,5 +1,5 @@
 ---
-title: "VSCode Remote Containers でAWS CDK と AWS SAM を使いコンテナ内部でLambdaを実行する"
+title: "VSCode Remote Containers で git push AWS CDK と AWS SAM を使いコンテナ内部でLambdaを実行する"
 emoji: "📌"
 type: "tech" # tech: 技術記事 / idea: アイデア
 topics: ["vscode", "AWS", "CDK", "SAM"]
@@ -161,7 +161,7 @@ docker.errors.APIError: 500 Server Error: Internal Server Error ("b'Mounts denie
 sam local invoke AppStack-Function --no-event -t ./cdk.out/AppStack.template.json --container-host host.docker.internal
 ```
 
-以下のsam local invokeコマンドに、記載があった。
+以下のsam local invokeコマンドのオプション説明に、上記に関して記載があった。
 https://docs.aws.amazon.com/ja_jp/serverless-application-model/latest/developerguide/sam-cli-command-reference-sam-local-invoke.html
 
 これを指定しないと以下のように`No response from invoke container for ~`という出力が出てしまう。
@@ -179,7 +179,7 @@ No response from invoke container for AppStackFunctionA0C4729X
 冒頭に挙げた必要な設定を施した、以下のリポジトリをRemote Containersで開く。
 https://github.com/nmemoto/vscode-remote-containers-cdk-and-sam
 
-(筆者のDocker for Mac)CDKプロジェクトのあるディレクトリで、以下コマンド実行することでコンテナ内でLambdaのテスト実行ができる。
+(筆者のDocker for Mac環境では、)CDKプロジェクトのあるディレクトリで、以下コマンド実行することでコンテナ内でLambdaのテスト実行ができる。
 
 ```bash
 $ cdk synth --no-staging
