@@ -20,20 +20,21 @@ EventBridgeにちゃんと触れたことがなかったので、やってみよ
 
 ## CDK
 
-CDKの2系だと、[v2.7.0](https://github.com/aws/aws-cdk/releases/tag/v2.7.0)から対応が入っており、筆者はv2.8.0で実施した。
+CDKの2系だと、[v2.7.0](https://github.com/aws/aws-cdk/releases/tag/v2.7.0)から対応が入っており、筆者はv2.8.0とv2.20.0で実施した。
 
 ### class Bucket (construct)
 
-上記のリリースページに`Added new Bucket property to enable this feature (eventBridgeEnabled: true)`とある通り、eventBridgeEnabledを有効にしたBucketを作ればできるはずだった。[class Bucket (construct)](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_s3.Bucket.html#eventbridgeenabled)でもそう書いてあるように見えるが、実際にリソースは作成に失敗してしまう。
+v2.20.0以降のバージョンでは、[class Bucket (construct)](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_s3.Bucket.html#eventbridgeenabled)にあるように、この設定だけでEventBridgeに通知を送ることができるようになる。
 
-```
-    // S3 バケット作成(こちらだと作成できなかった)
-    // const bucket = new Bucket(this, `${this.stackName}-Bucket`, {
-    //   eventBridgeEnabled: true
-    // })
+```typescript
+    // S3 バケット作成
+    const bucket = new Bucket(this, `${this.stackName}-Bucket`, {
+      eventBridgeEnabled: true
+    })
 ```
 
-constructsが内部的に作っていると思われるLambdaが以下のようなエラーをCloudWatch Logsに吐き、結果としてスタックで定義したリソースは作成されなかった。
+v2.7.0とv2.8.0にもこの設定は入っていたものの、このバージョンではconstructsが内部的に作っていると思われるLambdaが以下のようなエラーをCloudWatch Logsに吐き、結果としてスタックで定義したリソースは作成されなかった。
+v2.7.0とv2.8.0のこの設定は[v2.9.0](https://github.com/aws/aws-cdk/releases/tag/v2.9.0)でrevertされていた。
 
 ```
 4:10:23 PM | CREATE_FAILED        | Custom::S3BucketNotifications | AppStack-Bucket/Notifications
@@ -48,11 +49,11 @@ Log Stream: 2022/01/23/[$LATEST]cfcaa42e5fcc49af90531885959d7e41 (RequestId: d6c
 210-2be5f0535d4a)
 ```
 
-後日確認したが、[CDK v2.9.0](https://github.com/aws/aws-cdk/releases/tag/v2.9.0)でrevertされていた。
 
 ### CfnBucket
 
 [class CfnBucket (construct)のnotificationConfiguration](https://docs.aws.amazon.com/cdk/api/v2//docs/aws-cdk-lib.aws_s3.CfnBucket.html#notificationconfiguration)で[eventBridgeConfiguration](https://docs.aws.amazon.com/cdk/api/v2//docs/aws-cdk-lib.aws_s3.CfnBucket.NotificationConfigurationProperty.html#eventbridgeconfiguration)の設定はできた。
+ただ、上記に記載したとおりv2.20.0で class Bucket (construct) の設定ができるようになったため、個人的にはこちらを使うことはなくなりそう。
 
 ```
     // S3 バケット作成
@@ -74,7 +75,7 @@ EventBridgeの挙動を確認するために、イベントパターンにシン
 
 ## パターン1
 
-```
+```typescript
     // Lambda Function 作成
     const fn = new Function(this, `${this.stackName}-Function`, {
       functionName: `${this.stackName}-Function`,
@@ -137,7 +138,7 @@ EventBridgeの挙動を確認するために、イベントパターンにシン
 
 [ドキュメントに記載されているイベントの形式](https://docs.aws.amazon.com/AmazonS3/latest/userguide//ev-events.html)と同じ形式で出力されていました。(ただし、ドキュメント上 objectに含まれるversionは、S3のバージョニングを有効にしていなかったためか出力されていなかった。)
 
-このときこのルールに紐付いているCloudWatch Metricsも以下のように出力されていることを確認しました。
+このときこのEventBridge Ruleに紐付いているCloudWatch Metricsも以下のように出力されていることを確認しました。
 
 ![](/images/s3-eventnotification-with-eventbridge/cloudwatch_metrics_pattern.png =500x)
 
@@ -146,11 +147,11 @@ EventBridgeの挙動を確認するために、イベントパターンにシン
 
 パターン1に以下の設定を加え、パターン2としました
 
-- eventPattern の resources にCDKで作成したS3バケットを指定
+- eventPattern の resources にCDKで作成したS3バケットを指定([class Bucket (construct)](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_s3.Bucket.html)利用の場合)
 - ターゲットにわたすイベントを指定
     - LambdaにわたすイベントをEventBridgeが発行したイベントから必要な項目(ここでは、イベント発生時刻・S3オブジェクトキーとそのサイズのみ)で構成されるオブジェクトに設定
 
-```
+```typescript
     // Lambda Function 作成
     const fn = ・・・・
 
@@ -160,7 +161,7 @@ EventBridgeの挙動を確認するために、イベントパターンにシン
       eventPattern: {
         "source": ["aws.s3"],
         "detailType": ["Object Created"],
-        "resources": [bucket.attrArn]
+        "resources": [bucket.bucketArn]
       },
       targets: [new LambdaFunction(fn, {
         event: RuleTargetInput.fromObject({
@@ -177,27 +178,27 @@ EventBridgeの挙動を確認するために、イベントパターンにシン
 上記の設定で**CDKで作成したS3バケット**(変数bucketのS3バケット)にオブジェクトを作成すると、Lambdaのログで以下のように出力がありました。
 
 ```
-2022-01-26T14:19:14.323Z	9c8e278b-75b8-45f1-a275-0781a3bc0d19	INFO	EVENT: 
+2022-04-08T16:23:23.435Z	2f2444b2-f3aa-4715-a90d-d9ffd5b3e5e6	INFO	EVENT: 
 {
-    "time": "2022-01-26T14:19:10Z",
+    "time": "2022-04-08T16:23:20Z",
     "object": {
-        "key": "test.txt",
-        "size": 0
+        "key": "index.json",
+        "size": 18766
     }
 }
 ```
 
 上記の出力より、パターン1で出力したイベントのうち、必要な項目のみ指定したオブジェクトをイベントとしてLambdaが受けていることがわかります。
-このときの CloudWatch Metricsは、パターン1と同様にTriggeredRulesとInvocationsが1ずつ表示されていました。
+このときのEventBridge RuleのCloudWatch Metricsは、パターン1と同様にTriggeredRulesとInvocationsが1ずつ表示されていました。
 
 ちなみに、試しにイベントパターンに指定していないバケットでオブジェクト作成してみましたが、ルールのトリガーは発生しませんでした。
 
 # リポジトリ
 
-https://github.com/nmemoto/aws-s3-eventbridge-cdk にパターン2の構成をリポジトリを置きました。もし実行される場合は、バケット名を変更しないと実行できないです。
+https://github.com/nmemoto/aws-s3-eventbridge-cdk にパターン2の構成をリポジトリを置きました。
 
 # まとめ
 
 - S3イベント通知のEventBridge有効化設定をバケット毎にできるようになった。これを有効にすることによりバケット内の全てのイベント通知をEventBridgeで受けれるようになる。
-- 筆者の環境(CDK v2.8.0)で [Bucket(Constructs)のeventbridgeenabled](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_s3.Bucket.html#eventbridgeenabled)をtrueにしても正常動作しなかった。[CfnBucket(Constructs)のnotificationConfiguration](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_s3.CfnBucket.html#notificationconfiguration) [eventBridgeConfiguration](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_s3.CfnBucket.NotificationConfigurationProperty.html#eventbridgeconfiguration)の設定を使ったらできた。
+- v2.20.0 で [Bucket(Constructs)のeventbridgeenabled](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_s3.Bucket.html#eventbridgeenabled)をtrueにすると、S3イベント通知のEventBridge有効化が設定できる。
 - EventBridgeのルールのイベントパターンでEventBridgeのルールをトリガーする条件を指定でき、ターゲットで実行したい処理(Lambda等)と実行したい処理に渡すイベントの形式を指定できる。
