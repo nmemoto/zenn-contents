@@ -58,4 +58,4 @@ Remote Containersのような仕組みが他のIDEにも組み込まれれば、
 ## 2022/5/30 追記
 
 dev container CLIは[その存在が示されたとき](https://github.com/microsoft/vscode-docs/commit/f756b40098b1e8945ca2e0e830fd1d6d99f6b562)からRemote Containersとは独立に実行できるコマンドではあったようです。
-ただ、当時dev container CLIのソースは発表されておらず、またその使い方がVSCode(Remote Containers)のドキュメント上のみで示されていたため、dev container CLIは事実上Remote Containersのためのツールと言っても過言ではなかったのではないかと思っています。
+ただ、当時dev container CLIのソースは公開されておらず、またその使い方がVSCode(Remote Containers)のドキュメント上のみで示されていたため、dev container CLIは事実上Remote Containersのためのツールと言っても過言ではなかったのではないかと思っています。
