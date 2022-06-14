@@ -16,7 +16,7 @@ https://code.visualstudio.com/updates/v1_68#_development-container-specification
 
 GitHub ActionとAzure DevOpsでdevcontainer.jsonで定義されたDevelopment Containerを使えるようになったようだ。
 
-Development Containerについては、以下の記事を参照されたし。
+Development Containerについては、以下の記事を参照のこと。
 https://zenn.dev/nmemoto/articles/devcontainer-cli
 
 以降、本記事ではGitHub ActionでのDevelopment Containerの利用について記載する。
@@ -36,52 +36,13 @@ https://github.com/nmemoto/try-devcontainer-ci/blob/main/.github/workflows/sampl
 基本的にはビルドしたDocker Imageを保存するDocker Registryが必要で今回はこのリポジトリのGitHub Container Registryを使用した。
 ただし、これを使用するためにはリポジトリをpublicにしておく必要がある。
 
-```yaml
-name: 'build' 
-on: # rebuild any PRs and main branch changes
-  pull_request:
-  push:
-    branches:
-      - main
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-
-      - name: Checkout (GitHub)
-        uses: actions/checkout@v2
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v1 
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and run dev container task
-        uses: devcontainers/ci@v0.2
-        with:
-          imageName: ghcr.io/nmemoto/try-devcontainer-ci
-          runCmd: go test
-```
 
 リポジトリ内の.devcontainer/devcontainer.jsonは以下のみで、ローカル開発で使用したDev container featuresの設定しかない。
 
-```json
-{
-	"name": "vscode-golang-template",
-	"image": "mcr.microsoft.com/vscode/devcontainers/base:debian",
-	"features": {
-		"golang": "latest",
-		"github-cli": "latest"
-	},
-	"remoteUser": "vscode"
-}
-```
+https://github.com/nmemoto/try-devcontainer-ci/blob/main/.devcontainer/devcontainer.json
 
 
-`go test`は以下で実行されていた。
+workflow上だと`go test`は以下で実行されていた。
 https://github.com/nmemoto/try-devcontainer-ci/runs/6828092540?check_suite_focus=true#step:4:2796
 
 
