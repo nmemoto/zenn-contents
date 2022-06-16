@@ -21,7 +21,6 @@ erDiagram
         uuid id
         string name 
     }
-    users ||--o{ follows: ""
     articles ||--|{ comments:""
     articles {
         uuid id
