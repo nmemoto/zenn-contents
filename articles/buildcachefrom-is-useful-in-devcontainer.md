@@ -133,7 +133,7 @@ Container started
 {"outcome":"success","containerId":"f990fcc871d08572194fa321dc96f17f8413ca73f07d233a9c6f724978012101","remoteUser":"vscode","remoteWorkspaceFolder":"/workspaces/try-devcontainer-ci"}
 :::
 
-逆に`build.cacheFrom`を使わないときはDev container featuresでプログラミング言語の環境を用意するべきではなく、以下のようなベースイメージに含まれていたものを使ったほうがよさそうなことも明らかになったと思う。
+逆に`build.cacheFrom`を使わないときはDev container featuresでプログラミング言語の環境を用意するべきではなく、以下のようなベースイメージに含まれていたものを使うのが、Dockerビルドの時間の観点では好ましいことも明らかになった。
 https://github.com/microsoft/vscode-dev-containers/tree/main/containers/go
 
 
