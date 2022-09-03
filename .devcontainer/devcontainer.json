@@ -1,7 +1,17 @@
 {
   "name": "zenn-contents",
-  "image": "mcr.microsoft.com/vscode/devcontainers/javascript-node:0-16-bullseye",
-  "extensions": ["GitHub.vscode-pull-request-github"],
+  "build": {
+    "dockerfile": "Dockerfile",
+    "cacheFrom": "ghcr.io/nmemoto/zenn-contents"
+  },
+  "customizations": {
+    "vscode": {
+        "extensions": [
+            "GitHub.vscode-pull-request-github",
+            "eamodio.gitlens"
+        ]
+    }
+  },
   "portsAttributes": {
     "8000": {
       "label": "Zenn Preview",
@@ -9,7 +19,9 @@
     }
   },
   "features": {
-    "github-cli": "latest"
+    "ghcr.io/devcontainers/features/github-cli:1": {
+        "version": "latest"
+    }
   },
   "postStartCommand": "npm install",
   "remoteUser": "node"
