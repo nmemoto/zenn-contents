@@ -2,7 +2,7 @@
 title: "VSCode Remote Containers で AWS CDK と AWS SAM を使いコンテナ内部でLambdaを実行する"
 emoji: "📌"
 type: "tech" # tech: 技術記事 / idea: アイデア
-topics: ["vscode", "AWS", "CDK", "SAM"]
+topics: ["vscode", "AWS", "CDK", "SAM", "remotecontainers", "devcontainer"]
 published: true
 ---
 
@@ -18,16 +18,20 @@ published: true
 ```json:.devcontainer/devcontainer.json
 {
   "name": "cdk-and-sam",
-  "image": "mcr.microsoft.com/vscode/devcontainers/base:debian-11",
+  "image": "mcr.microsoft.com/devcontainers/base:debian",
   "workspaceMount": "source=${localWorkspaceFolder},target=${localWorkspaceFolder},type=bind",
-  "extensions": [
-    "amazonwebservices.aws-toolkit-vscode",
-  ],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "amazonwebservices.aws-toolkit-vscode"
+      ]    
+    }
+  },
   "features": {
-    "node": {
+    "ghcr.io/devcontainers/features/node:1": {
       "version": "lts"
     },
-    "docker-from-docker": {
+    "ghcr.io/devcontainers/features/docker-from-docker:1": {
       "version": "latest"
     }
   },
@@ -66,21 +70,22 @@ https://github.com/nmemoto/vscode-remote-containers-cdk-and-sam
 
 以下の設定は、Dev container features の機能を用いたものである。
 ```json
-    "features": {
-      "node": {
-        "version": "lts"
-      },
-      "docker-from-docker": {
-        "version": "latest"
-      }
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
     },
+    "ghcr.io/devcontainers/features/docker-from-docker:1": {
+      "version": "latest"
+    }
+  },
 ```
 
 これにより、AWS CDKコマンドの実行環境のためのNode.jsと、AWS CDKやAWS SAM CLIが内部的に使用しているDockerコマンド実行のための環境構築を行っている。
-ちなみに、docker-from-docker導入時の処理は[こちら](https://github.com/microsoft/vscode-dev-containers/blob/6ae40d55b753e0af7f23f3da53efd587eecbd5f5/script-library/docker-debian.sh)にあるが、いい感じにホストのDocker Engineを使用できるようにソケットファイルの設定やユーザーの権限設定をやってくれ、面倒な設定を肩代わりしてくれることがわかる。
+ちなみに、docker-from-docker導入時の処理は[こちら](https://github.com/devcontainers/features/blob/main/src/docker-from-docker/install.sh)にあるが、いい感じにホストのDocker Engineを使用できるようにソケットファイルの設定やユーザーの権限設定をやってくれ、面倒な設定を肩代わりしてくれることがわかる。
 
 Dev container features については公式情報だと以下に説明がある。
 https://code.visualstudio.com/docs/remote/containers#_dev-container-features-preview
+https://github.com/devcontainers/features
 
 また、Dev container featuresについては、筆者も過去に以下でまとめている。
 https://zenn.dev/nmemoto/articles/dev-container-features-are-useful#dev-container-features-(preview)
@@ -124,7 +129,7 @@ Workspace Volume Mountの設定なしだと、コンテナ内のデフォルト�
         ・・・・・・・
         "FunctionName": "AppStack-Function",
         "Handler": "index.handler",
-        "Runtime": "nodejs14.x",
+        "Runtime": "nodejs16.x",
         "Timeout": 3
       },
       "DependsOn": [
@@ -164,14 +169,14 @@ sam local invoke AppStack-Function --no-event -t ./cdk.out/AppStack.template.jso
 以下のsam local invokeコマンドのオプション説明に、上記に関して記載があった。
 https://docs.aws.amazon.com/ja_jp/serverless-application-model/latest/developerguide/sam-cli-command-reference-sam-local-invoke.html
 
-これを指定しないと以下のように`No response from invoke container for ~`という出力が出てしまう。
+これを指定しないと以下のように接続ができずにタイムアウトの出力が出てしまう。
 
 ```bash
-Invoking index.handler (nodejs14.x)
-Skip pulling image and use local one: public.ecr.aws/sam/emulation-nodejs14.x:rapid-1.40.1-x86_64.
+Invoking index.handler (nodejs16.x)
+Skip pulling image and use local one: public.ecr.aws/sam/emulation-nodejs16.x:rapid-1.56.0-x86_64.
 
 Mounting /Users/nmemoto/ghq/github.com/nmemoto/vscode-remote-containers-cdk-and-sam/app/lambda/my_function as /var/task:ro,delegated inside runtime container
-No response from invoke container for AppStackFunctionA0C4729X
+Timed out while attempting to establish a connection to the container. You can increase this timeout by setting the SAM_CLI_CONTAINER_CONNECTION_TIMEOUT environment variable. The current timeout is 20.0 (seconds).
 ```
 
 # まとめ
@@ -185,11 +190,13 @@ https://github.com/nmemoto/vscode-remote-containers-cdk-and-sam
 $ cdk synth --no-staging
 
 $ sam local invoke AppStack-Function --no-event -t ./cdk.out/AppStack.template.json --container-host host.docker.internal
-Invoking index.handler (nodejs14.x)
-Skip pulling image and use local one: public.ecr.aws/sam/emulation-nodejs14.x:rapid-1.40.1-x86_64.
+Invoking index.handler (nodejs16.x)
+Image was not found.
+Removing rapid images for repo public.ecr.aws/sam/emulation-nodejs16.x
+Building image...........................................................................
+Skip pulling image and use local one: public.ecr.aws/sam/emulation-nodejs16.x:rapid-1.56.0-x86_64.
 
 Mounting /Users/nmemoto/ghq/github.com/nmemoto/vscode-remote-containers-cdk-and-sam/app/lambda/my_function as /var/task:ro,delegated inside runtime container
-END RequestId: cf333e12-fbc6-4e05-8935-07a8fa5bc0b7
-REPORT RequestId: cf333e12-fbc6-4e05-8935-07a8fa5bc0b7  Init Duration: 0.27 ms  Duration: 284.44 ms     Billed Duration: 285 ms Memory Size: 128 MB        Max Memory Used: 128 MB
-"Hello from SAM and the CDK!"
+"Hello from SAM and the CDK!"END RequestId: e402ec93-bbcd-4e73-aa7e-e170105b3b36
+REPORT RequestId: e402ec93-bbcd-4e73-aa7e-e170105b3b36  Init Duration: 0.41 ms  Duration: 107.41 ms     Billed Duration: 108 ms Memory Size: 128 MB       Max Memory Used: 128 MB
 ```

@@ -2,7 +2,7 @@
 title: "Zenn 記事の執筆環境を VSCode Remote Containers を使って構築する"
 emoji: "💨"
 type: "tech"
-topics: ["vscode"]
+topics: ["vscode", "zenn", "remotecontainers", "devcontainer"]
 published: true
 ---
 
@@ -14,15 +14,15 @@ GitHub上で管理する Zenn 記事の執筆環境を VSCode Remote Containers 
 
 ## ベースイメージ
 
-[github.com/microsoft/vscode-remote-try-node](https://github.com/microsoft/vscode-remote-try-node)で使用している [mcr.microsoft.com/vscode/devcontainers/javascript-node](https://github.com/microsoft/vscode-dev-containers/tree/main/containers/javascript-node):0-16-bullseye を使用することとした。
+[github.com/microsoft/vscode-remote-try-node](https://github.com/microsoft/vscode-remote-try-node)で使用している [mcr.microsoft.com/devcontainers/javascript-node](https://github.com/devcontainers/images/tree/main/src/javascript-node)を参考に、[mcr.microsoft.com/devcontainers/typescript-node](https://github.com/devcontainers/images/tree/main/src/typescript-node)使用することとした。
 
 その際、以下の2点を考慮した。
 - Zenn CLI は Node.js で動作する
 - Zenn 記事を GitHub で管理する
   - Git とコミットの Push 等の Git リモートリポジトリの操作ための SSH クライアントが必要
 
-このイメージはmicrosoft管理のイメージで、Remote Containersを使うために必要十分な設定がされている。
-採用したイメージは、nodeをベースイメージとし、[Dockerビルドの処理](https://github.com/microsoft/vscode-dev-containers/blob/v0.215.1/containers/javascript-node/.devcontainer/base.Dockerfile)内で[実行されているシェルスクリプト](https://github.com/microsoft/vscode-dev-containers/blob/v0.215.1/containers/javascript-node/.devcontainer/base.Dockerfile#L23)により開発で最低限必要なgitやopenssh-client等のパッケージが導入された状態で利用を開始できるのが良い。
+このイメージは devcontainers 管理のイメージで、Development Containerとして使用するために必要十分な設定がされている。
+採用したイメージは、nodeをベースイメージとし、開発で最低限必要なgitやopenssh-client等のパッケージは[Dev Container Featuresのcommon-utils](https://github.com/devcontainers/features/tree/main/src/common-utils)によって導入された状態で利用を開始できるのが良い。
 
 ## Remote Containers 設定
 
@@ -31,8 +31,18 @@ GitHub上で管理する Zenn 記事の執筆環境を VSCode Remote Containers 
 ```json:.devcontainer/devcontainer.json
 {
   "name": "zenn-contents",
-  "image": "mcr.microsoft.com/vscode/devcontainers/javascript-node:0-16-bullseye",
-  "extensions": ["GitHub.vscode-pull-request-github"],
+  "build": {
+    "dockerfile": "Dockerfile",
+    "cacheFrom": "ghcr.io/nmemoto/zenn-contents"
+  },
+  "customizations": {
+    "vscode": {
+        "extensions": [
+            "GitHub.vscode-pull-request-github",
+            "eamodio.gitlens"
+        ]
+    }
+  },
   "portsAttributes": {
     "8000": {
       "label": "Zenn Preview",
@@ -40,17 +50,23 @@ GitHub上で管理する Zenn 記事の執筆環境を VSCode Remote Containers 
     }
   },
   "features": {
-    "github-cli": "latest"
+    "ghcr.io/devcontainers/features/github-cli:1": {
+        "version": "latest"
+    }
   },
-  "postCreateCommand": "npm install",
+  "postStartCommand": "npm install",
   "remoteUser": "node"
 }
 ```
 
-[`postsAttributes`](https://code.visualstudio.com/docs/remote/devcontainerjson-reference#_port-attributes)はコンテナ内で起動するプレビューアプリケーションをホスト側で閲覧するためのデフォルトのポートフォワード設定で、`npx zenn preview`のデフォルトの起動ポートの8000を指定した。
+```Dockerfile:Dockerfile
+FROM mcr.microsoft.com/devcontainers/typescript-node:0-16-bullseye
+```
+
+[`postsAttributes`](https://containers.dev/implementors/json_reference/#general-properties)はコンテナ内で起動するプレビューアプリケーションをホスト側で閲覧するためのデフォルトのポートフォワード設定で、`npx zenn preview`のデフォルトの起動ポートの8000を指定した。
 `"onAutoForward": "openBrowser"`は、ポートフォワードされたタイミングでこのポートを使うアプリケーションをシステムのデフォルトブラウザで開くために設定した。
 
-`features`は、2022年1月27日現在、Preview 機能である[Dev container features](https://code.visualstudio.com/docs/remote/containers#_dev-container-features-preview)のことを指しており、https://github.com/microsoft/vscode-dev-containers/tree/main/script-library/docs に記載のあるツールについてはこの記法で該当ツールを導入できるようになる。
+`features`は、2022年9月11日現在、Preview 機能である[Dev container features](https://code.visualstudio.com/docs/remote/containers#_dev-container-features-preview)のことを指しており、https://github.com/devcontainers/features に記載のあるツールについてはこの記法で該当ツールを導入できるようになる。
 ここでは`github-cli`を導入している。
 
 `postStartCommand`ではコンテナ起動後に実行されるコマンドを設定できる。
@@ -58,11 +74,11 @@ Zennのコンテンツを管理しているこのリポジトリでは、Dependa
 新しい記事を書くタイミングで最新のmainブランチからブランチを作成すれば、その次にコンテナ起動したタイミングで`postStartCommand`で指定した`npm install`が動作し、自然と最新のzenn-cliを使用できるようになる。
 なお、DependabotとGitHub Actionsによる自動マージについては[GitHub ActionsでのDependabotの自動化](https://docs.github.com/ja/code-security/supply-chain-security/keeping-your-dependencies-updated-automatically/automating-dependabot-with-github-actions#common-dependabot-automations)に詳しく記載されていた。
 
-devcontainer.jsonのそれぞれの設定の詳細については、[devcontainer.jsonのリファレンス](https://code.visualstudio.com/docs/remote/devcontainerjson-reference)に記載がある。
+devcontainer.jsonのそれぞれの設定の詳細については、[devcontainer.jsonのリファレンス](https://containers.dev/implementors/json_reference/)に記載がある。
 
 
 # まとめ
 
-- ベースイメージは、[mcr.microsoft.com/vscode/devcontainers/javascript-node](https://github.com/microsoft/vscode-dev-containers/tree/main/containers/javascript-node):0-16-bullseye を使うとよさげ。
+- ベースイメージは、[mcr.microsoft.com/devcontainers/typescript-node](https://github.com/devcontainers/images/tree/main/src/typescript-node):0-16-bullseye を使うとよさげ。
 - `.devcontainer/devcontainer.json`の`postsAttributes`を使用し、ポートフォワード時にブラウザで`http://localhost:8000`を開くようにする。
 - DependabotとGitHub Actionsにpackage.jsonの最新化の処理をさせ、マージさせる。postStartCommand`を使用し、コンテナ起動時に毎回`npm install`を実行させると、新しい記事を書くタイミングで最新のzenn-cliを使用することができる。
