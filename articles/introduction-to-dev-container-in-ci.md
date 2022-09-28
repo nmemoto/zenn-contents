@@ -27,7 +27,7 @@ https://github.com/devcontainers/ci/blob/main/docs/github-action.md
 上記を見ると、`devcontainers/ci@v0.2`というActionsを用いていることがわかる。Actionsについては[GitHub Docs > GitHub Actions > Learn GitHub Actions > Actions](https://docs.github.com/en/actions/learn-github-actions/understanding-github-actions#actions)を参照のこと。
 
 また、`devcontainers/ci`のソースは以下。
-https://github.com/dezvcontainers/ci
+https://github.com/devcontainers/ci
 
 [devcontainers/ciのGitHub Actionのドキュメント](https://github.com/devcontainers/ci/blob/main/docs/github-action.md#getting-started)を参考に、以下のリポジトリで実際にDevelopement ContainerでのCI(と言っても、go testしているだけだが)をやってみた。
 
