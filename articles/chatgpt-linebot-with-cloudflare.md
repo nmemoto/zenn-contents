@@ -28,20 +28,23 @@ Cloudflare側の構成では、LINEからの処理受付とChatGPTへのリク�
 LINE Messaging API のwebhookを利用していますが、ボットサーバーは1秒以内にレスポンスを返す必要がありそうでした。
 https://developers.line.biz/ja/docs/messaging-api/receiving-messages/#check-error-reason
 
-webhookのリクエストを受けたWorkerで直接レスポンスを返そうとすると、ChatGPT APIからのレスポンスに時間がかかる場合があるため、worker内で行おうとしているクライアント側(webhook側)からリクエストがキャンセルされる事象を確認しました。
-そのためwebhookからのWorkerChatGPT APIからのレスポンスにやD1への参照・登録操作等のworkerの処理途中で処理が終了していました。
+webhookのリクエストを受けたWorkerで直接レスポンスを返そうとすると、ChatGPT APIからのレスポンスに時間がかかる場合があるため、クライアント側(webhook側)からのリクエストがキャンセルされる事象を確認しました。
+その結果としてworkerの処理が途中で終了してしまい、LINE側に応答メッセージを返せないことがありました。
 
-そのため、webhookからのリクエストを受けるWorkerでは、Queueに必要なデータを送りステータスコード200のレスポンスだけ処理とし、それとは別のWorkerでQueueからデータを取り出し必要な処理を行う構成としています。
+そこで、webhookからのリクエストを受けるWorkerをChatGPT APIへのリクエスト・LINE側への応答リクエスト・D1への登録に必要なデータをQueueに送りステータスコード200のレスポンスだけ返す処理とし、それとは別のWorkerでQueueからデータを取り出し必要な処理を行う構成としました。
 
-[[ChatGPT API][AWSサーバーレス]ChatGPT APIであなたとの会話・文脈を覚えてくれるLINEボットを作る方法まとめ](https://dev.classmethod.jp/articles/chatgpt-api-line-bot-aws-serverless/) では、Amazon APIGateway + AWS Lambdaの構成でこのような話は出ていなかったですが、おそらくLINE−APIGateway間の接続が終了してもAPIGateway-Lambda間の接続は終了しておらずLambda側の処理が継続できたからなのではと推測しています。
+[[ChatGPT API][AWSサーバーレス]ChatGPT APIであなたとの会話・文脈を覚えてくれるLINEボットを作る方法まとめ](https://dev.classmethod.jp/articles/chatgpt-api-line-bot-aws-serverless/) では、Amazon APIGateway + AWS Lambdaの構成でこのような話は出ていなかったですが、おそらくLINE−API Gateway間の接続が終了してもAPI Gateway-Lambda間の接続は終了しておらずLambda側の処理が継続できたからなのではと推測しています。
 ([AWS Lambda Functions URL](https://docs.aws.amazon.com/ja_jp/lambda/latest/dg/lambda-urls.html)を使った構成でどうなるか、確認してみたいです。)
 
 ## LINEの設定と動作検証
 
 LINEの設定と、その検証のためのCloudflare Workersの構成は、[Cloudflare Worker + D1 + Hono + OpenAIでLINE Botを作る](https://zenn.dev/razokulover/articles/4d0ba10083524e#%E6%9C%80%E4%BD%8E%E9%99%90%E3%81%AE%E6%8C%99%E5%8B%95%E3%82%92%E3%81%99%E3%82%8Bline-bot%E3%82%92%E4%BD%9C%E3%82%8B) を参考にしました。
 
-上記と同じですが、後述するCloudflare Workerでは`POST /api/webhook`を受ける構成としており、webhook urlとして`[ベースURL]/api/webhook`を指定しています。
+上記と同じですが、後述するCloudflare Workerでは`POST /api/webhook`を受ける構成としており、LINE側に設定するwebhook urlも`[ベースURL]/api/webhook`を指定しています。
 
+以下は古い記載のため、読み飛ばして問題ないです。
+
+:::details Hono導入前の構成時の本文
 ただし、最終的なCloudflare Workersの構成ではhonoを使用しませんでした。これは、Queuesを使用するため、Producer WorkerとConsumer Workerを以下のように構成する必要があると考えたからでした。
 
 ```typescript
@@ -57,6 +60,7 @@ export default {
 上記は[ここ](https://developers.cloudflare.com/queues/get-started/#5-create-your-consumer-worker)からの一部引用。
 
 honoを使ってもQueueを使う構成を取れるか、知見をお持ちの方教えていただきたく。
+:::
 
 ## D1の構成
 
@@ -145,10 +149,58 @@ npx wrangler secret put CHANNEL_ACCESS_TOKEN
 npx wrangler secret put OPENAI_API_KEY
 ```
 
-
 ### Workersのソースコード
 
-Consumer Worker(`async queue(batch: MessageBatch<Error>, env: Environment): Promise<void> {...}`)の処理はおおよそ以下のようになっています。
+#### 全体
+
+Queueを使うときの構成でfetchという名前のProducer Workerとqueueという名前のConsumer Workerの関数を実装する必要があります。
+Producer WorkerでHonoを使う場合は、以下のようにすればよいとyusukebeさんよりコメント頂きました。ありがとうございます。
+
+```typescript
+import { Hono } from "hono";
+type Bindings = {
+  DB: D1Database;
+  QUEUE: Queue;
+  CHANNEL_ACCESS_TOKEN: string;
+  ・・・・
+};
+const app = new Hono<{ Bindings: Bindings }>();
+app.post("/api/webhook", async (c) => {
+    ・・・
+}
+export default {
+  fetch: app.fetch,
+  async queue(batch: MessageBatch<Error>, env: Bindings): Promise<void> {
+    ・・・・・・
+  },
+};
+```
+
+#### Producer Worker
+
+Honoを使って、簡潔なルーティングの記載をしています。
+```typescript
+const app = new Hono<{ Bindings: Bindings }>();
+
+app.post("/api/webhook", async (c) => {
+    ・・・
+}
+```
+
+Queueへのメッセージ追加も以下で簡単にできます。lineのユーザーID、ユーザーの投稿した内容、LINE側に応答メッセージを送るために必要なreplyTokenをメッセージに含めています。
+```typescript
+  const queueData = {
+    userId,
+    content: text,
+    replyToken,
+  };
+  await c.env.QUEUE.send(queueData);
+```
+
+
+#### Consumer Worker
+
+Consumer Worker(`async queue(batch: MessageBatch<Error>, env: Environment): Promise<void> {...}`)の処理は以下のようになっています。
 
 1. キューのメッセージ(ユーザーの入力内容)を取り出す
     複数のメッセージを処理する可能性があるので、for文でぐるぐる回して以下の処理をする
@@ -209,11 +261,13 @@ Consumer Worker(`async queue(batch: MessageBatch<Error>, env: Environment): Prom
 :::details Workersのソースコード
 ```typescript
 import { TextMessage, WebhookEvent } from "@line/bot-sdk";
+import { Hono } from "hono";
 
-type Environment = {
+type Bindings = {
   DB: D1Database;
   QUEUE: Queue;
   CHANNEL_ACCESS_TOKEN: string;
+  CHANNEL_SECRET: string;
   OPENAI_API_KEY: string;
 };
 
@@ -260,38 +314,33 @@ type ChatGPTResponse = {
   }[];
 };
 
+const app = new Hono<{ Bindings: Bindings }>();
+
+app.post("/api/webhook", async (c) => {
+  // Extract From Request Body
+  const data = await c.req.json<RequestBody>();
+  const event = data.events[0];
+  if (event.type !== "message" || event.message.type !== "text") {
+    return new Response("body error", { status: 400 });
+  }
+  const { source, replyToken } = event;
+  if (source.type !== "user") {
+    return new Response("body error", { status: 400 });
+  }
+  const { userId } = source;
+  const { text } = event.message;
+  const queueData = {
+    userId,
+    content: text,
+    replyToken,
+  };
+  await c.env.QUEUE.send(queueData);
+  return c.json({ message: "ok" });
+});
+
 export default {
-  async fetch(req: Request, env: Environment): Promise<Response> {
-    // Request Check
-    const { pathname } = new URL(req.url);
-    if (pathname !== "/api/webhook") {
-      return new Response("path error", { status: 400 });
-    }
-    const method = req.method;
-    if (method.toLowerCase() !== "post") {
-      return new Response("path error", { status: 400 });
-    }
-    // Extract From Request Body
-    const data = await req.json<RequestBody>();
-    const event = data.events[0];
-    if (event.type !== "message" || event.message.type !== "text") {
-      return new Response("body error", { status: 400 });
-    }
-    const { source, replyToken } = event;
-    if (source.type !== "user") {
-      return new Response("body error", { status: 400 });
-    }
-    const { userId } = source;
-    const { text } = event.message;
-    const queueData = {
-      userId,
-      content: text,
-      replyToken,
-    };
-    await env.QUEUE.send(queueData);
-    return new Response("Success!");
-  },
-  async queue(batch: MessageBatch<Error>, env: Environment): Promise<void> {
+  fetch: app.fetch,
+  async queue(batch: MessageBatch<Error>, env: Bindings): Promise<void> {
     let messages = JSON.stringify(batch.messages);
     const queueMessages = JSON.parse(messages) as QueueMessage[];
     for await (const message of queueMessages) {
