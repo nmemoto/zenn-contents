@@ -2,12 +2,12 @@
 title: "ChatGPT APIとCloudflareを使って過去の会話を覚えてるLINEボットを構築する"
 emoji: "🔥"
 type: "tech" # tech: 技術記事 / idea: アイデア
-topics: ["Cloudflare", "Cloudflare Workers", "Cloudflare Queues", "Cloudflare D1", "ChatGPT API"]
+topics: ["Cloudflare", "Cloudflare Workers", "queues", "d1", "chatgpt"]
 published: true
 ---
 
 ChatGPT APIの[Chat Completion API](https://platform.openai.com/docs/api-reference/chat)を用いて、チャットの入力に対してその回答をレスポンスで返してくれます。
-このチャットの入力に過去のチャットの内容を含めて入力することで、過去の内容を前提とした回答を行うことができますが、これを実現するには、過去のチャットの内容を永続化しておく必要があります。
+このチャットの入力に過去のチャットの内容を含めることで、過去の内容を前提とした回答を行うことができますが、これを実現するには、過去のチャットの内容を永続化しておく必要があります。
 
 ユーザーインターフェースとしてLINE(LINE Messaging API)、LINEからの処理受付とChatGPTへのリクエスト、チャット内容の永続化をCloudflareを使って、過去の会話を覚えてるLINEボットを実現することができました。
 本記事では、Cloudflare側の構成について紹介します。
@@ -17,11 +17,6 @@ ChatGPT APIの[Chat Completion API](https://platform.openai.com/docs/api-referen
 Cloudflare側の構成では、LINEからの処理受付とChatGPTへのリクエストでCloudflare Workers、チャット内容の永続化でCloudflare D1を利用します。
 さらに、この構成ではCloudflare Queuesを用いています。
 2023/3/5現在、Cloudflare Queuesの利用には[Workers Paid Plan](https://developers.cloudflare.com/workers/platform/pricing/)が必要になりますので、参考にされる方はご注意ください。
-
-本記事では、すでに以下の関連記事で取り上げられている内容を参照しつつ、紹介する構成特有の部分について説明していくこととします。
-
-- [Cloudflare Worker + D1 + Hono + OpenAIでLINE Botを作る](https://zenn.dev/razokulover/articles/4d0ba10083524e)
-
 
 ## なぜ Cloudflare Queues を使用したか
 
@@ -197,13 +192,13 @@ Queueへのメッセージ追加も以下で簡単にできます。lineのユ�
   await c.env.QUEUE.send(queueData);
 ```
 
-
 #### Consumer Worker
 
 Consumer Worker(`async queue(batch: MessageBatch<Error>, env: Environment): Promise<void> {...}`)の処理は以下のようになっています。
 
 1. キューのメッセージ(ユーザーの入力内容)を取り出す
     複数のメッセージを処理する可能性があるので、for文でぐるぐる回して以下の処理をする
+
 1. ユーザーの入力内容をD1に登録
     ```typescript
     await env.DB.prepare(
@@ -257,9 +252,10 @@ Consumer Worker(`async queue(batch: MessageBatch<Error>, env: Environment): Prom
           },
         });
     ```
+Workersの処理全体は以下に記載しました。
 
 :::details Workersのソースコード
-```typescript
+```typescript::src/index.tsx
 import { TextMessage, WebhookEvent } from "@line/bot-sdk";
 import { Hono } from "hono";
 
@@ -405,10 +401,35 @@ export default {
 ```
 :::
 
+### デプロイ
+
+以下のようにpackage.jsonに設定しておき
+
+```json::package.json
+{
+  "scripts": {
+    ・・・・
+    "deploy": "wrangler publish src/index.ts",
+    ・・・・
+  },
+  ・・・・
+}
+```
+
+以下のコマンドで実施
+
+```shell-session
+npm run deploy
+```
+
+
+## リポジトリ
+
+https://github.com/nmemoto/chatgpt-linebot-with-cloudflare
+
 ## まとめ
 
 Cloudflare Workers/D1/QueuesとChatGPT APIのChat Completion APIを用いて、過去の会話を覚えてくれるLINEボットを作りました。
-
 
 ## 参考
 
