@@ -58,9 +58,10 @@ Cloudflare PagesアプリケーションのWranglerでのデプロイは、[wran
 筆者は、以下のコマンドで Astro のプロジェクトを作成していた。
 
 ```shell
+npm create cloudflare@latest -- playground --type webFramework --framework astro --deploy
 ```
 
-通常のプロジェクトに加えられた処理は以下である。npx astro add cloudflare -y でライブラリ追加しているのと、package.jsonにpages関連のコマンドが追加されているのがわかる。
+通常のプロジェクトに加えられた処理は以下である。`npx astro add cloudflare -y` でライブラリ追加しているのと、package.jsonにpages関連のコマンドが追加されているのがわかる。
 
 https://github.com/cloudflare/workers-sdk/blob/main/packages/create-cloudflare/src/frameworks/astro/index.ts
 
@@ -72,33 +73,6 @@ GitHubでリポジトリ管理しており、CI/CDでGitHub Actionsを使う場�
 
 Wrangler GitHub Actionを使った、AstroのプロジェクトをCloudflare Pagesにビルドデプロイするために構成した設定は以下となっている。
 https://github.com/nmemoto/nmemoto.dev/blob/main/.github/workflows/push.yml
-
-```yaml
-name: Deploy
-on:
-  push:
-    branches:
-      - main
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    steps:
-      - uses: actions/checkout@v4
-      - name: Playground Install
-        run: npm install
-        working-directory: ./playground  
-      - name: Playground Build
-        run: npm run build
-        working-directory: ./playground
-      - name: Playground Deploy
-        uses: cloudflare/wrangler-action@v3.4.0
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          workingDirectory: "playground"
-          command: pages deploy ./dist --project-name playground
-```
 
 詳しい使い方は https://github.com/cloudflare/wrangler-action を確認して頂きたい。
 
